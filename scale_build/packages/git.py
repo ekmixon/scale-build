@@ -58,9 +58,7 @@ class GitPackageMixin:
 
     @property
     def existing_branch(self):
-        if not self.exists:
-            return None
-        return retrieve_git_branch(self.source_path)
+        return retrieve_git_branch(self.source_path) if self.exists else None
 
     def get_branch_override(self):
         gh_override = BRANCH_OVERRIDES.get(self.name)

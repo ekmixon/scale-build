@@ -152,9 +152,10 @@ def install_grub_freebsd(input, manifest, pool_name, dataset_name, disks):
     run_command(["grub-mkconfig", "-o", "/boot/grub/grub.cfg"])
 
     for disk in disks:
-        if boot_partition_type in ["bios-boot", "freebsd-boot"]:
-            if boot_partition_type != "bios-boot":
-                run_command(["gpart", "modify", "-i", "1", "-t", "bios-boot", f"/dev/{disk}"])
+        if boot_partition_type == "bios-boot":
+            run_command(["grub-install", "--target=i386-pc", f"/dev/{disk}"])
+        elif boot_partition_type == "freebsd-boot":
+            run_command(["gpart", "modify", "-i", "1", "-t", "bios-boot", f"/dev/{disk}"])
             run_command(["grub-install", "--target=i386-pc", f"/dev/{disk}"])
         elif boot_partition_type == "efi":
             os.makedirs("/boot/efi", exist_ok=True)
@@ -170,10 +171,21 @@ def install_grub_freebsd(input, manifest, pool_name, dataset_name, disks):
 
 def configure_system_for_zectl(boot_pool):
     root_ds = os.path.join(boot_pool, "ROOT")
-    set_prop = IS_FREEBSD or run_command([
-        "zfs", "get", "-H", "-o", "value", "org.zectl:bootloader", root_ds
-    ]).stdout.strip() != 'grub'
-    if set_prop:
+    if (
+        set_prop := IS_FREEBSD
+        or run_command(
+            [
+                "zfs",
+                "get",
+                "-H",
+                "-o",
+                "value",
+                "org.zectl:bootloader",
+                root_ds,
+            ]
+        ).stdout.strip()
+        != 'grub'
+    ):
         run_command(["zfs", "set", "org.zectl:bootloader=grub", root_ds])
 
 
@@ -236,7 +248,7 @@ def main():
                         stdout += buffer.decode("utf-8", "ignore")
                         buffer = b""
 
-                    if buffer and buffer[0:1] == b"\r" and buffer[-1:] == b"%":
+                    if buffer and buffer[:1] == b"\r" and buffer[-1:] == b"%":
                         if m := RE_UNSQUASHFS_PROGRESS.match(buffer[1:].decode("utf-8", "ignore")):
                             write_progress(
                                 int(m.group("extracted")) / int(m.group("total")) * 0.9,
@@ -332,7 +344,7 @@ def main():
                         run_command(["mount", "-t", "zfs", f"{pool_name}/grub", f"{root}/boot/grub"])
                         undo.append(["umount", f"{root}/boot/grub"])
 
-                        for device in sum([glob.glob(f"/dev/{disk}*") for disk in disks], []) + ["/dev/zfs"]:
+                        for device in sum((glob.glob(f"/dev/{disk}*") for disk in disks), []) + ["/dev/zfs"]:
                             run_command(["touch", f"{root}{device}"])
                             run_command(["mount", "-o", "bind", device, f"{root}{device}"])
                             undo.append(["umount", f"{root}{device}"])
@@ -397,9 +409,10 @@ def main():
                                                  partition])
                                 run_command(["chroot", root, "mount", "-t", "vfat", partition, "/boot/efi"])
 
-                                if copy_bsd_loader:
-                                    if not os.path.exists(root + SCALE_BSD_LOADER_PATH):
-                                        shutil.copyfile(root + CORE_BSD_LOADER_PATH, root + SCALE_BSD_LOADER_PATH)
+                                if copy_bsd_loader and not os.path.exists(
+                                    root + SCALE_BSD_LOADER_PATH
+                                ):
+                                    shutil.copyfile(root + CORE_BSD_LOADER_PATH, root + SCALE_BSD_LOADER_PATH)
 
                                 try:
                                     grub_cmd = ["chroot", root, "grub-install", "--target=x86_64-efi",

@@ -50,7 +50,7 @@ class ConsoleFilter(logging.Filter):
 class LogHandler(logging.NullHandler):
 
     def handle(self, record):
-        rv = LoggingContext.has_handler()
-        if rv:
+        if rv := LoggingContext.has_handler():
             return LoggingContext.handler().handle(record)
-        return rv
+        else:
+            return rv

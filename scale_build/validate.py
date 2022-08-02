@@ -25,8 +25,7 @@ def validate_system_state():
     if os.geteuid() != 0:
         raise CallError('Must be run as root (or using sudo)!')
 
-    missing_packages = retrieve_missing_packages()
-    if missing_packages:
+    if missing_packages := retrieve_missing_packages():
         raise MissingPackagesException(missing_packages)
 
 

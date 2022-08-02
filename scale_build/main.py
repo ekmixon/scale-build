@@ -39,8 +39,7 @@ def setup_logging():
 def validate_config():
     manifest = get_manifest()
     packages = [p['name'] for p in manifest['sources']]
-    invalid_overrides = [o for o in BRANCH_OVERRIDES if o not in packages]
-    if invalid_overrides:
+    if invalid_overrides := [o for o in BRANCH_OVERRIDES if o not in packages]:
         raise CallError(
             f'Invalid branch override(s) provided: {", ".join(invalid_overrides)!r} sources not configured in manifest'
         )
